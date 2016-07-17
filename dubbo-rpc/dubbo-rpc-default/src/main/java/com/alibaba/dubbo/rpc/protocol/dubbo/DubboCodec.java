@@ -63,8 +63,6 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
     public static final byte RESPONSE_NULL_VALUE = 2;
 
-    public static final byte RESPONSE_ATTACHMENT = 3;
-
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     public static final Class<?>[] EMPTY_CLASS_ARRAY = new Class<?>[0];

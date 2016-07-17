@@ -41,7 +41,6 @@ import com.alibaba.dubbo.remoting.telnet.codec.TelnetCodec;
 import com.alibaba.dubbo.remoting.transport.CodecSupport;
 import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcResult;
-import com.alibaba.dubbo.rpc.protocol.dubbo.DubboCodec;
 
 /**
  * ExchangeCodec.
@@ -71,6 +70,11 @@ public class ExchangeCodec extends TelnetCodec {
     protected static final byte     FLAG_EVENT     = (byte) 0x20;
 
     protected static final int      SERIALIZATION_MASK = 0x1f;
+    
+    /**
+     * attchment flag
+     */
+    public static final byte RESPONSE_ATTACHMENT = 3;
 
     public Short getMagicCode() {
         return MAGIC;
@@ -171,7 +175,7 @@ public class ExchangeCodec extends TelnetCodec {
 
         try {
             byte attachmentFlag = in.readByte();
-            if (DubboCodec.RESPONSE_ATTACHMENT == attachmentFlag) {
+            if (RESPONSE_ATTACHMENT == attachmentFlag) {
                 // read attachment
                 return in.readObject(HashMap.class);
             } else {

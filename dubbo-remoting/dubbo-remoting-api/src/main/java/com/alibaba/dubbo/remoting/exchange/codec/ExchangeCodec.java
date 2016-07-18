@@ -74,7 +74,8 @@ public class ExchangeCodec extends TelnetCodec {
     /**
      * attchment flag
      */
-    public static final byte RESPONSE_ATTACHMENT = 3;
+    public static final byte RESPONSE_ATTACHMENT = 0x21;
+    
 
     public Short getMagicCode() {
         return MAGIC;

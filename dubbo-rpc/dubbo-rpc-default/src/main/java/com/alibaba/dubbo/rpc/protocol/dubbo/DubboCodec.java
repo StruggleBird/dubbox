@@ -198,21 +198,27 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
     @Override
     protected void encodeResponseData(Channel channel, ObjectOutput out, Object data) throws IOException {
-        Result result = (Result) data;
-
-        Throwable th = result.getException();
-        if (th == null) {
-            Object ret = result.getValue();
-            if (ret == null) {
-                out.writeByte(RESPONSE_NULL_VALUE);
+        if (data instanceof Result) {
+            Result result = (Result) data;
+            Throwable th = result.getException();
+            if (th == null) {
+                Object ret = result.getValue();
+                if (ret == null) {
+                    out.writeByte(RESPONSE_NULL_VALUE);
+                } else {
+                    out.writeByte(RESPONSE_VALUE);
+                    out.writeObject(ret);
+                }
             } else {
-                out.writeByte(RESPONSE_VALUE);
-                out.writeObject(ret);
+                out.writeByte(RESPONSE_WITH_EXCEPTION);
+                out.writeObject(th);
             }
         } else {
-            out.writeByte(RESPONSE_WITH_EXCEPTION);
-            out.writeObject(th);
+            // attachments
+            out.writeByte(RESPONSE_ATTACHMENT);
+            out.writeObject(data);
         }
+       
     }
 
     // workaround for the target method matching of kryo & fst

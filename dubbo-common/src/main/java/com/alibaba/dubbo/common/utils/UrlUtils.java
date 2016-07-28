@@ -373,11 +373,31 @@ public class UrlUtils {
         String providerGroup = providerUrl.getParameter(Constants.GROUP_KEY);
         String providerVersion = providerUrl.getParameter(Constants.VERSION_KEY);
         String providerClassifier = providerUrl.getParameter(Constants.CLASSIFIER_KEY, Constants.ANY_VALUE);
+
+        // boolean versionMatched = versionMatch(consumerVersion, providerVersion);
+        // //这里不做版本号匹配，交给AbstractClusterInvoker去做版本选择
+
         return (Constants.ANY_VALUE.equals(consumerGroup) || StringUtils.isEquals(consumerGroup, providerGroup) || StringUtils.isContains(consumerGroup, providerGroup))
-               && (Constants.ANY_VALUE.equals(consumerVersion) || StringUtils.isEquals(consumerVersion, providerVersion))
+
                && (consumerClassifier == null || Constants.ANY_VALUE.equals(consumerClassifier) || StringUtils.isEquals(consumerClassifier, providerClassifier));
     }
     
+    /**
+     * 判断版本号是否匹配，版本号匹配规则：消费者版本号大于或等于提供者版本号则匹配成功（向下兼容原则）,如果为空则认为是最小版本。如果消费者版本为空而提供者有版本号，则不匹配
+     * ，如果消费者有版本号而提供者没有版本号（提供者版本号是最小的）则匹配成功
+     * 
+     * @param consumerVersion
+     * @param providerVersion
+     * @return
+     * @date 2016年7月25日
+     * @author Ternence
+     */
+    private static boolean versionMatch(String consumerVersion, String providerVersion) {
+        
+        return Constants.ANY_VALUE.equals(consumerVersion) || (consumerVersion == null && providerVersion == null) || (consumerVersion != null && providerVersion == null) || (consumerVersion != null && providerVersion != null && consumerVersion
+                        .compareTo(providerVersion) >= 0);
+    }
+
     public static boolean isMatchGlobPattern(String pattern, String value, URL param) {
         if (param != null && pattern.startsWith("$")) {
             pattern = param.getRawParameter(pattern.substring(1));

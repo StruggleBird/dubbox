@@ -336,6 +336,8 @@ public class Constants {
 
     public static final String  VERSION_KEY                        = "version";
 
+    public static final String  GRAY_VERSION_KEY                   = "gray.version";
+
     public static final String  REVISION_KEY                       = "revision";
 
     public static final String  DUBBO_VERSION_KEY                  = "dubbo";

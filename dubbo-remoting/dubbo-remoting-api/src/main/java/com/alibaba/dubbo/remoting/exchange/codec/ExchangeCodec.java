@@ -17,8 +17,6 @@ package com.alibaba.dubbo.remoting.exchange.codec;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
 
 import com.alibaba.dubbo.common.io.Bytes;
 import com.alibaba.dubbo.common.io.StreamUtils;
@@ -39,8 +37,6 @@ import com.alibaba.dubbo.remoting.exchange.Response;
 import com.alibaba.dubbo.remoting.exchange.support.DefaultFuture;
 import com.alibaba.dubbo.remoting.telnet.codec.TelnetCodec;
 import com.alibaba.dubbo.remoting.transport.CodecSupport;
-import com.alibaba.dubbo.rpc.Result;
-import com.alibaba.dubbo.rpc.RpcResult;
 
 /**
  * ExchangeCodec.
@@ -53,7 +49,7 @@ public class ExchangeCodec extends TelnetCodec {
     private static final Logger     logger             = LoggerFactory.getLogger(ExchangeCodec.class);
 
     // header length.
-    protected static final int HEADER_LENGTH = 20;
+    protected static final int      HEADER_LENGTH      = 16;
 
     // magic header.
     protected static final short    MAGIC              = (short) 0xdabb;
@@ -70,12 +66,6 @@ public class ExchangeCodec extends TelnetCodec {
     protected static final byte     FLAG_EVENT     = (byte) 0x20;
 
     protected static final int      SERIALIZATION_MASK = 0x1f;
-    
-    /**
-     * attchment flag
-     */
-    public static final byte RESPONSE_ATTACHMENT = 0x21;
-    
 
     public Short getMagicCode() {
         return MAGIC;
@@ -133,28 +123,15 @@ public class ExchangeCodec extends TelnetCodec {
         checkPayload(channel, len);
 
         int tt = len + HEADER_LENGTH;
-        if (readable < tt) {
+        if( readable < tt ) {
             return DecodeResult.NEED_MORE_INPUT;
         }
-
-        // attachments length
-        int attachLen = Bytes.bytes2int(header, 16);
 
         // limit input stream.
         ChannelBufferInputStream is = new ChannelBufferInputStream(buffer, len);
 
         try {
-            Object body = decodeBody(channel, is, header);
-            if (attachLen > 0) {
-                // has attachments need to decode
-                Response res = (Response) body;
-                RpcResult result = (RpcResult) res.getResult();
-                is = new ChannelBufferInputStream(buffer, attachLen);
-                Map<String, String> attachments = decodeAttachments(channel, is, header);
-                result.getAttachments().putAll(attachments);
-
-            }
-            return body;
+            return decodeBody(channel, is, header);
         } finally {
             if (is.available() > 0) {
                 try {
@@ -166,24 +143,6 @@ public class ExchangeCodec extends TelnetCodec {
                     logger.warn(e.getMessage(), e);
                 }
             }
-        }
-    }
-
-    private Map<String, String> decodeAttachments(Channel channel, ChannelBufferInputStream is, byte[] header) throws IOException {
-        byte flag = header[2], proto = (byte) (flag & SERIALIZATION_MASK);
-        Serialization s = CodecSupport.getSerialization(channel.getUrl(), proto);
-        ObjectInput in = s.deserialize(channel.getUrl(), is);
-
-        try {
-            byte attachmentFlag = in.readByte();
-            if (RESPONSE_ATTACHMENT == attachmentFlag) {
-                // read attachment
-                return in.readObject(HashMap.class);
-            } else {
-                return null;
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IOException(StringUtils.toString("Read attachments failed.", e));
         }
     }
 
@@ -349,41 +308,10 @@ public class ExchangeCodec extends TelnetCodec {
             int len = bos.writtenBytes();
             checkPayload(channel, len);
             Bytes.int2bytes(len, header, 12);
-            int attachLen = 0;
-
-            // write attachments
-            if (status == Response.OK && res.getResult() != null) {
-                buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);
-                bos = new ChannelBufferOutputStream(buffer);
-                out = serialization.serialize(channel.getUrl(), bos);
-                try {
-                    // encode response data or error message.
-                    Result result = (Result) res.getResult();
-                    encodeResponseData(channel, out, result.getAttachments());
-                    out.flushBuffer();
-                } finally {
-                    // modified by lishen
-                    if (out instanceof Cleanable) {
-                        ((Cleanable) out).cleanup();
-                    }
-                }
-
-                bos.flush();
-                bos.close();
-
-                attachLen = bos.writtenBytes();
-                checkPayload(channel, attachLen);
-                Bytes.int2bytes(attachLen, header, 16);
-            } else {
-                Bytes.int2bytes(0, header, 16);
-            }
-
-
-
             // write
             buffer.writerIndex(savedWriteIndex);
             buffer.writeBytes(header); // write header.
-            buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len + attachLen);
+            buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);
         } catch (Throwable t) {
             // 发送失败信息给Consumer，否则Consumer只能等超时了
             if (! res.isEvent() && res.getStatus() != Response.BAD_RESPONSE) {

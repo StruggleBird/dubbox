@@ -15,6 +15,7 @@
  */
 package com.alibaba.dubbo.rpc.cluster.support;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ import com.alibaba.dubbo.common.extension.ExtensionLoader;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NetUtils;
+import com.alibaba.dubbo.common.utils.ReflectUtils;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Result;
@@ -171,7 +173,8 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
      * @date 2016年7月25日
      * @author Ternence
      */
-    private List<Invoker<T>> getPriorInvokers(List<Invoker<T>> invokers) {
+    @SuppressWarnings("rawtypes")
+	private List<Invoker<T>> getPriorInvokers(List<Invoker<T>> invokers) {
         if (invokers.size() <= 1) {
             return invokers;
         }
@@ -191,8 +194,18 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         Map<String, List<Invoker<T>>> invokersMap = new HashMap<String, List<Invoker<T>>>(invokers.size());
         String maxVersion = null; // 最大的版本号
         for (Invoker<T> invoker : invokers) {
-
-            String version = invoker.getUrl().getParameter(Constants.VERSION_KEY);
+        	String version = null;
+        	if (invoker.getClass().getName().equals("com.alibaba.dubbo.registry.integration.RegistryDirectory$InvokerDelegete")) {
+        		URL providerURL;
+				try {
+					providerURL = (URL) ReflectUtils.getValueByFieldName(invoker, "providerUrl");
+				} catch (Exception e) {
+					throw new RpcException(e);
+				} 
+				version = providerURL.getParameter(Constants.VERSION_KEY);
+			}else {
+				version = invoker.getUrl().getParameter(Constants.VERSION_KEY);
+			}
             List<Invoker<T>> list = invokersMap.get(version);
             if (list == null) {
                 list = new ArrayList<Invoker<T>>(invokers.size());
@@ -209,7 +222,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
 
         }
 
-        // 如果消费者预期的版本号不存在，则选择最大版本号的提供者
+        // 如果和消费者匹配的版本号不存在，则选择最大版本号的提供者
         if (!invokersMap.containsKey(finalVersion)) {
             finalVersion = maxVersion;
         }

@@ -66,8 +66,9 @@ public class ClusterUtils {
                 map.put(Constants.DUBBO_VERSION_KEY, dubbo);
             }
             String version = remoteMap.get(Constants.VERSION_KEY);
-            map.put(Constants.VERSION_KEY, version); // 这里不做空判断 ，如果为null则以null为准，防止消费者的版本号覆盖了提供者的版本号
-
+            if (version != null && version.length() > 0) {
+                map.put(Constants.VERSION_KEY, version);
+            }
             String group = remoteMap.get(Constants.GROUP_KEY);
             if (group != null && group.length() > 0) {
                 map.put(Constants.GROUP_KEY, group);

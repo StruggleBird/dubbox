@@ -15,11 +15,8 @@
  */
 package com.alibaba.dubbo.rpc.cluster.support;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
@@ -28,15 +25,12 @@ import com.alibaba.dubbo.common.extension.ExtensionLoader;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NetUtils;
-import com.alibaba.dubbo.common.utils.ReflectUtils;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Result;
-import com.alibaba.dubbo.rpc.RpcContext;
 import com.alibaba.dubbo.rpc.RpcException;
 import com.alibaba.dubbo.rpc.cluster.Directory;
 import com.alibaba.dubbo.rpc.cluster.LoadBalance;
-import com.alibaba.dubbo.rpc.cluster.directory.AbstractDirectory;
 import com.alibaba.dubbo.rpc.support.RpcUtils;
 
 /**
@@ -131,10 +125,6 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
             return null;
         if (invokers.size() == 1)
             return invokers.get(0);
-
-        // 如果存在多个版本的提供者，则按照优先级别来选择出一批可用的invoker。优先规则：1、高版本优先
-        invokers = getPriorInvokers(invokers);
-
         // 如果只有两个invoker，退化成轮循
         if (invokers.size() == 2 && selected != null && selected.size() > 0) {
             return selected.get(0) == invokers.get(0) ? invokers.get(1) : invokers.get(0);
@@ -163,73 +153,8 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
             }
         }
         return invoker;
-    }
-
-    /**
-     * 获取优先的invokers列表
-     * 
-     * @param invokers
-     * @return 返回相同版本号的一批invoker
-     * @date 2016年7月25日
-     * @author Ternence
-     */
-    @SuppressWarnings("rawtypes")
-	private List<Invoker<T>> getPriorInvokers(List<Invoker<T>> invokers) {
-        if (invokers.size() <= 1) {
-            return invokers;
-        }
-
-        String finalVersion = null; // 最终版本号
-        // 优先匹配灰色版本号
-        String grayVersion = (String) RpcContext.getContext().get(Constants.GRAY_VERSION_KEY);
-        if (grayVersion != null) {
-            finalVersion = grayVersion;
-        } else if (directory instanceof AbstractDirectory) {
-            // 如果不存在灰色版本号，则匹配消费者版本号
-            AbstractDirectory<T> aDirectory = (AbstractDirectory<T>) directory;
-            finalVersion = aDirectory.getConsumerUrl().getParameter(Constants.VERSION_KEY);
-        }
-
-        // key为invoker的版本号的map
-        Map<String, List<Invoker<T>>> invokersMap = new HashMap<String, List<Invoker<T>>>(invokers.size());
-        String maxVersion = null; // 最大的版本号
-        for (Invoker<T> invoker : invokers) {
-        	String version = null;
-        	if (invoker.getClass().getName().equals("com.alibaba.dubbo.registry.integration.RegistryDirectory$InvokerDelegete")) {
-        		URL providerURL;
-				try {
-					providerURL = (URL) ReflectUtils.getValueByFieldName(invoker, "providerUrl");
-				} catch (Exception e) {
-					throw new RpcException(e);
-				} 
-				version = providerURL.getParameter(Constants.VERSION_KEY);
-			}else {
-				version = invoker.getUrl().getParameter(Constants.VERSION_KEY);
-			}
-            List<Invoker<T>> list = invokersMap.get(version);
-            if (list == null) {
-                list = new ArrayList<Invoker<T>>(invokers.size());
-                invokersMap.put(version, list);
-            }
-
-            list.add(invoker);
-
-            if (maxVersion == null) {
-                maxVersion = version;
-            } else if (maxVersion != null && version != null && version.compareTo(maxVersion) > 0) {
-                maxVersion = version;
-            }
-
-        }
-
-        // 如果和消费者匹配的版本号不存在，则选择最大版本号的提供者
-        if (!invokersMap.containsKey(finalVersion)) {
-            finalVersion = maxVersion;
-        }
-
-        return invokersMap.get(finalVersion);
-    }
-
+    } 
+    
     /**
      * 重选，先从非selected的列表中选择，没有在从selected列表中选择.
      * @param loadbalance
